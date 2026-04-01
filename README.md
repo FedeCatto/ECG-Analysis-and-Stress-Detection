@@ -1,67 +1,103 @@
-# ECG-Analysis-and-Stress-Detection
+# ECG Analysis & Stress Detection
 
-This project focuses on the analysis of **electrocardiographic (ECG) signals** and the classification of stress using **classical machine learning** techniques.  
-The main goal is to transform raw physiological signals into a reliable binary classification between **"stress"** and **"non-stress"** states.
+> Binary stress classification from physiological signals using classical ML and HRV feature engineering
 
----
-
-## 📌 Project Overview
-
-The work analyzes data from **15 subjects** from a public [PhysioNet](https://physionet.org/) dataset, acquired through chest sensors with a **sampling rate of 700 Hz**.  
-
-The analysis covers the full lifecycle of a **Data Science project**: from raw data exploration, preprocessing, class balancing, to model evaluation.
+A full data science pipeline that transforms raw ECG recordings into reliable stress/non-stress predictions. The project covers every stage from signal acquisition to model evaluation — with deliberate design choices at each step to handle the real constraints of physiological data: inter-subject variability, noisy labels, class imbalance, and the risk of data leakage.
 
 ---
 
-## 🛠️ Technical Workflow
+## Dataset
+
+15 subjects from a public **PhysioNet** dataset, recorded via chest sensors at **700 Hz**. Binary target: `stress` vs. `non-stress`.
+
+---
+
+## Pipeline
 
 ### 1. Signal Preprocessing
-To ensure data quality and reduce inter-subject variability, a cleaning pipeline was implemented:
 
-- **Standardization:** Z-score normalization to mitigate amplitude differences between subjects.  
-- **Filtering:** Band-pass filter (0.5 Hz - 40 Hz) to remove noise and baseline wander.  
-- **Zero-phase filtering:** Forward-backward filtering to preserve temporal structure without phase distortions.  
+Raw ECG signals require careful cleaning before any feature can be trusted.
 
-### 2. Segmentation and Labeling
-The continuous signal was divided into fixed-length windows:
+- **Z-score normalisation** — removes amplitude differences between subjects, preventing the model from learning individual physiology rather than stress states
+- **Band-pass filter (0.5–40 Hz)** — attenuates baseline wander and high-frequency noise while preserving the diagnostically relevant signal
+- **Zero-phase (forward-backward) filtering** — eliminates phase distortion, keeping the temporal structure of cardiac events intact
 
-- **Sliding Window:** 10-second windows with 50% overlap.  
-- **Majority Voting:** Each window is labeled as "stress" if more than 50% of its samples are in that state, increasing robustness against noisy labels.  
+### 2. Segmentation & Labelling
+
+The continuous signal is cut into **10-second sliding windows with 50% overlap**. Each window is labelled by majority vote — assigned "stress" only if more than half its samples fall in that state. This makes labels more robust to transient noise at state boundaries.
 
 ### 3. Feature Extraction
-**16 key features** were extracted from the signal:
 
-- **Time Domain:** Mean, standard deviation, RMS, Hjorth parameters (activity, mobility, complexity), zero-crossing rate.  
-- **Frequency Domain:** Power spectral density (Welch’s method), power in LF (0.04–0.15 Hz) and HF (0.15–0.40 Hz) bands, LF/HF ratio.  
-- **Heart Rate Variability (HRV):** R-peak detection and metrics such as SDNN, RMSSD, pNN50.  
+16 features extracted per window across three domains:
 
----
+**Time domain**
+- Mean, standard deviation, RMS
+- Hjorth parameters (activity, mobility, complexity)
+- Zero-crossing rate
 
-## 🧪 Model Training and Evaluation
+**Frequency domain**
+- Power spectral density via Welch's method
+- Band power in LF (0.04–0.15 Hz) and HF (0.15–0.40 Hz)
+- LF/HF ratio — a standard autonomic nervous system marker
 
-- **Dataset split:** Subject-based (12 training, 3 testing) to avoid **data leakage** and evaluate generalization to new individuals.  
-- **Handling class imbalance:**  
-  - SMOTE (Synthetic Minority Over-sampling Technique)  
-  - Undersampling (Random and NearMiss)  
-  - Class-weighted SVC  
-  - Bagging Classifier  
-
-**Key results:**  
-The combination of **SMOTE** and **RBF SVC** (optimized via grid search) achieved the best trade-off:
-
-- **Macro F1 Score:** 0.67  
-- **Accuracy:** 0.81  
-- **Recall (Stress class):** 0.66  
+**Heart Rate Variability (HRV)**
+- R-peak detection
+- SDNN, RMSSD, pNN50
 
 ---
 
-## 📈 Conclusions and Future Work
+## Modelling
 
-This project demonstrates that **classical machine learning models**, supported by solid feature engineering, can effectively detect stress from ECG signals.  
+### Train/test split strategy
 
-Future directions could include:
+Split is **subject-based**: 12 subjects for training, 3 held out for testing. This is a deliberate choice — a random window-level split would leak temporal context from the same individual into both sets, inflating performance and hiding the model's true ability to generalise to unseen people.
 
-- Applying **Deep Learning models** to learn directly from raw signals.  
-- Integrating **multimodal approaches** with additional physiological signals.  
+### Handling class imbalance
+
+Four strategies evaluated:
+
+| Strategy | Description |
+|----------|-------------|
+| SMOTE | Synthetic oversampling of the minority class |
+| Random undersampling | Downsample the majority class |
+| NearMiss | Distance-based undersampling |
+| Class-weighted SVC | Penalise misclassification of minority class at training time |
+
+### Results
+
+Best configuration: **SMOTE + RBF SVC** (hyperparameters tuned via grid search).
+
+| Metric | Score |
+|--------|-------|
+| Accuracy | 0.81 |
+| Macro F1 | 0.67 |
+| Recall (stress class) | 0.66 |
+
+Macro F1 is the primary metric here — accuracy alone is misleading when the stress class is underrepresented and the cost of a missed detection is higher than a false alarm.
 
 ---
+
+## Key Design Decisions
+
+A few choices that shaped the results and are worth calling out explicitly:
+
+- **Subject-based split** prevents data leakage and gives a realistic estimate of generalisation
+- **Majority voting** on window labels reduces sensitivity to noisy state transitions
+- **LF/HF ratio** directly encodes autonomic nervous system dynamics — a physiologically grounded feature, not just a statistical artefact
+- **Macro F1 as primary metric** correctly penalises ignoring the minority stress class
+
+---
+
+## Limitations & Next Steps
+
+Classical ML with hand-crafted features delivers interpretable, lightweight models — but has a ceiling. Planned extensions:
+
+- **Deep learning on raw signals** — CNNs or transformers that learn representations directly from waveforms, bypassing manual feature design
+- **Multimodal fusion** — combine ECG with additional signals (EDA, respiration, PPG) for richer stress characterisation
+- **Personalised models** — subject-adaptive calibration to reduce inter-individual variability
+
+---
+
+## Stack
+
+`Python` `scikit-learn` `SciPy` `SMOTE` `HRV analysis` `signal processing` `ECG` `feature engineering` `binary classification`
